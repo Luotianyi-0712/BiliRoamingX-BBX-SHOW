@@ -5,7 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
-import  android.content.IntentFilterimport android.content.SharedPreferences
+import android.content.SharedPreferences
+import android.content.IntentFilter
 import android.net.Uri
 import android.os.Process
 import android.view.MotionEvent
