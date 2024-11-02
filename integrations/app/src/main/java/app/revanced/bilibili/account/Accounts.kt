@@ -28,6 +28,7 @@ object Accounts {
         Utils.getContext().getDir("account", Context.MODE_PRIVATE).let {
             Utils.blkvPrefsByFile(File(it, "controller.blkv"), true)
         }
+    }
 
     @JvmStatic
     private val accountMigrated get() = accountPrefs.getInt("account_migrate", 0) == 1
@@ -94,94 +95,8 @@ object Accounts {
         showBRBDialog()
         return true
     }
-}
 
     @JvmStatic
-    private fun readAccount(): Account? {
-        val passportFile = File(Utils.getContext().filesDir, "bili.passport.storage")
-        val cookieFile = File(Utils.getContext().filesDir, "bili.account.storage")
-        val currentAccount = accountPrefs.getString("current_account", "").orEmpty()
-        return runCatching {
-            val accountJson = currentAccount.ifEmpty { null }?.toJSONObject()
-            val account = if (accountMigrated) {
-                accountJson?.optString("token")
-            } else if (passportFile.isFile) {
-                passportFile.fastReadToString()
-            } else null
-            val cookie = if (accountMigrated) {
-                accountJson?.optString("cookie")
-            } else if (cookieFile.isFile) {
-                cookieFile.fastReadToString()
-            } else null
-            if (!account.isNullOrEmpty() && !cookie.isNullOrEmpty()) {
-                val accountInfo = biliAesDecrypt(account.base64Decode)
-                    .toString(Charset.defaultCharset()).fromJson<AccessToken>()
-                val cookieInfo = cookie.base64Decode.toString(Charset.defaultCharset())
-                    .fromJson<CookieInfo>()
-                Account(accountInfo, cookieInfo)
-            } else null
-        }.onFailure {
-            Logger.error(it) { "Accounts, failed to read account" }
-        }.getOrNull()
-    }
-
-    @JvmStatic
-    private fun File.fastReadToString(): String {
-        return RandomAccessFile(this, "r").use { file ->
-            val channel = file.channel
-            val length = file.length()
-            channel.lock(0L, length, true).use {
-                val buffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, length)
-                ByteArray(length.toInt()).apply { buffer.get(this) }.toString(Charset.defaultCharset())
-            }
-        }
-    }
-
-    @JvmStatic
-    private fun readAccountInfo(mid: Long): AccountInfo? = runCatching {
-        val infoKey = "info$mid"
-        val context = Utils.getContext()
-        (runCatchingOrNull {
-            val resolver = context.contentResolver
-            val uri = Uri.parse("content://${context.packageName}.provider.auth")
-            val cursor = resolver.query(uri, null, null, arrayOf(infoKey), null)
-            if (cursor != null && cursor.moveToFirst())
-                cursor.use { it.getString(0) }
-            else null
-        } ?: context.getSharedPreferences("bili.passport.auth", Context.MODE_PRIVATE)
-            .getString(infoKey, ""))?.fromJson<AccountInfo>()
-    }.onFailure {
-        Logger.error(it) { "Accounts, failed to read account info" }
-    }.getOrNull()
-
-    @JvmStatic
-    fun refresh(action: Int) {
-        val isSignOut = action == PassportChangeReceiver.ACTION_SIGN_OUT
-        val isUpdateAccount = action == PassportChangeReceiver.ACTION_UPDATE_ACCOUNT
-        val isSwitchAccount = action == PassportChangeReceiver.ACTION_SWITCH_ACCOUNT
-        if (isSignOut) {
-            accountCache = null
-            accountInfoCache = null
-        } else if (!isUpdateAccount) {
-            accountCache = null
-            Utils.async { get() }
-        } else {
-            accountInfoCache = null
-            Utils.async { getInfo() }
-        }
-        if ((isSignOut || isSwitchAccount) && Utils.isMainProcess() && Settings.Skin()) {
-            Settings.Skin.save(false)
-            Themes.unloadLoadEquip()
-            Toasts.showLongWithId("biliroaming_theme_closed_by_account")
-        }
-        showBRBDialog()
-    }
-
-object Accounts {
-
-    private var dialogShowing = false
-    private var dialogDismissed = false
-
     private fun showBRBDialog() {
         if (!dialogShowing && !dialogDismissed) {
             dialogShowing = true
@@ -210,7 +125,6 @@ object Accounts {
             }
         }
     }
-    
 }
 
 
